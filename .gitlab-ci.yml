@@ -1,47 +1,49 @@
 stages: [test, deploy]
 
-# LC tuolumne batch runner. The whole CI (build + test + docs build) runs in a
-# SINGLE 1-node allocation (one batch job); the pages job only republishes the
-# prebuilt artifact on a shell runner, so it takes no allocation.
-.tuolumne-batch:
+# LC tuolumne CI via an explicit Flux allocation:
+# the job runs on the shell runner, creates ONE 1-node allocation with
+# `flux batch`, grabs its id with `flux job last`, and then runs EACH CI step
+# inside that same allocation through `flux proxy <jobid>`. The allocation is
+# cancelled in after_script, so the whole pipeline uses a single allocation.
+.tuolumne-flux:
   id_tokens:
     SITE_ID_TOKEN:
       aud: https://lc.llnl.gov/gitlab
-  tags: [batch, tuolumne]
+  tags: [shell, tuolumne]
   variables:
     PYTHON_MODULE: python/3.13.2
     COMPILER_MODULE: cce/20.0.0
     SMALL_QUEUE: pdebug
     SMALL_QUEUE_WALLTIME: 60
-    SCHEDULER_PARAMETERS: "-N 1 -q $SMALL_QUEUE -t $SMALL_QUEUE_WALLTIME"
 
-# One allocation: build, test, and build the docs in the same batch job.
+# One allocation; every step below runs on it via flux proxy.
 build-test-docs:
-  extends: .tuolumne-batch
+  extends: .tuolumne-flux
   stage: test
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  before_script:
-    - module load $COMPILER_MODULE $PYTHON_MODULE
-    - export CC=cc CXX=CC
   script:
-    - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON
-    - cmake --build build -j "$(nproc)"
-    - ctest --test-dir build --output-on-failure
-    # Docs built inside the same allocation; published by the pages job below.
-    - python3 -m venv .venv-docs && source .venv-docs/bin/activate
-    - pip install -r docs/requirements.txt
-    - sphinx-build -b html docs public
+    # Create the allocation (a placeholder batch job that just sleeps).
+    - flux batch -N 1 -q "$SMALL_QUEUE" -t "${SMALL_QUEUE_WALLTIME}m" --job-name=cpp-logger-ci --wrap sleep inf
+    # Get the allocation's Flux job id and wait until it starts.
+    - JOBID=$(flux job last)
+    - echo "Using Flux allocation $JOBID"
+    - flux job wait-event -t 300 "$JOBID" start
+    # Each CI step runs on that allocation via flux proxy.
+    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE $PYTHON_MODULE && export CC=cc CXX=CC && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON"
+    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE && export CC=cc CXX=CC && cmake --build build -j \$(nproc)"
+    - flux proxy "$JOBID" bash -lc "ctest --test-dir build --output-on-failure"
+    - flux proxy "$JOBID" bash -lc "module load $PYTHON_MODULE && python3 -m venv .venv-docs && source .venv-docs/bin/activate && pip install -r docs/requirements.txt && sphinx-build -b html docs public"
+  after_script:
+    # Release the allocation even if a step failed.
+    - JOBID=$(flux job last) && flux cancel "$JOBID" || true
   artifacts:
     paths: [public]
 
 # Publishes the artifact from build-test-docs — shell runner, no allocation.
 pages:
-  id_tokens:
-    SITE_ID_TOKEN:
-      aud: https://lc.llnl.gov/gitlab
-  tags: [shell, tuolumne]
+  extends: .tuolumne-flux
   stage: deploy
   needs: [build-test-docs]
   rules:
