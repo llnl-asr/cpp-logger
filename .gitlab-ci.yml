@@ -1,24 +1,24 @@
 stages: [test, deploy]
 
-# LC tuolumne CI via an explicit Flux allocation:
+# LC corona CI via an explicit Flux allocation:
 # the job runs on the shell runner, creates ONE 1-node allocation with
 # `flux batch`, grabs its id with `flux job last`, and then runs EACH CI step
 # inside that same allocation through `flux proxy <jobid>`. The allocation is
 # cancelled in after_script, so the whole pipeline uses a single allocation.
-.tuolumne-flux:
+.corona-flux:
   id_tokens:
     SITE_ID_TOKEN:
       aud: https://lc.llnl.gov/gitlab
-  tags: [shell, tuolumne]
+  tags: [shell, corona]
   variables:
     PYTHON_MODULE: python/3.13.2
-    COMPILER_MODULE: cce/20.0.0
+    COMPILER_MODULE: gcc/11.2.1
     SMALL_QUEUE: pdebug
     SMALL_QUEUE_WALLTIME: 60
 
 # One allocation; every step below runs on it via flux proxy.
 build-test-docs:
-  extends: .tuolumne-flux
+  extends: .corona-flux
   stage: test
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -31,8 +31,8 @@ build-test-docs:
     - echo "Using Flux allocation $JOBID"
     - flux job wait-event -t 300 "$JOBID" start
     # Each CI step runs on that allocation via flux proxy.
-    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE $PYTHON_MODULE && export CC=cc CXX=CC && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON"
-    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE && export CC=cc CXX=CC && cmake --build build -j \$(nproc)"
+    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE $PYTHON_MODULE && export CC=gcc CXX=g++ && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON"
+    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE && export CC=gcc CXX=g++ && cmake --build build -j \$(nproc)"
     - flux proxy "$JOBID" bash -lc "ctest --test-dir build --output-on-failure"
     - flux proxy "$JOBID" bash -lc "module load $PYTHON_MODULE && python3 -m venv .venv-docs && source .venv-docs/bin/activate && pip install -r docs/requirements.txt && sphinx-build -b html docs public"
   after_script:
@@ -43,7 +43,7 @@ build-test-docs:
 
 # Publishes the artifact from build-test-docs — shell runner, no allocation.
 pages:
-  extends: .tuolumne-flux
+  extends: .corona-flux
   stage: deploy
   needs: [build-test-docs]
   rules:
