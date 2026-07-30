@@ -15,7 +15,10 @@ PODMAN="podman --root $PODMAN_STORE --runroot $PODMAN_RUNROOT"
 
 # Build + test in the same image the GitHub CI used.
 $PODMAN run --rm -v "$PWD:/ws" -w /ws docker.io/library/gcc:12 bash -ec '
-  apt-get update -qq && apt-get install -y -qq cmake
+  # APT::Sandbox::User=root: rootless podman has no mapped _apt uid, so apts
+  # privilege drop fails with "setgroups (22: Invalid argument)".
+  apt-get -o APT::Sandbox::User=root update -qq
+  apt-get -o APT::Sandbox::User=root install -y -qq cmake
   cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON
   cmake --build build -j "$(nproc)"
   ctest --test-dir build --output-on-failure
