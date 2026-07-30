@@ -13,7 +13,7 @@ stages: [alloc, test, deploy, cleanup]
   variables:
     PYTHON_MODULE: python/3.13.2
     COMPILER_MODULE: gcc/11.2.1
-    SMALL_QUEUE: pdebug
+    SMALL_QUEUE: pbatch
     SMALL_QUEUE_WALLTIME: 60
 
 allocate:
