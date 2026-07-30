@@ -23,6 +23,28 @@ git push origin develop         # this is the ONLY push to GitHub a revert needs
 git fetch origin && git reset --hard origin/develop   # only if you want to discard unmerged gitlab-only commits
 ```
 
+## In-place source changes (MUST fix when reverting)
+
+Some migrations change source files in place to point dependencies at GitLab. These are NOT additive and must be reverted explicitly — search the repo for `NOTE(gitlab-migration)` comments; each marks a line to restore.
+
+- **brahma** — `dependency/CMakeLists.txt`: cpp-logger `fetch_package` URL changed
+  from `https://github.com/LLNL/cpp-logger.git` to
+  `ssh://git@czgitlab.llnl.gov:7999/dftracer/cpp-logger.git`. On revert, restore the
+  GitHub URL (the old value is recorded in the `NOTE(gitlab-migration)` comment
+  directly above the `GIT` line).
+- **dftracer** — `dependency/CMakeLists.txt` (two changes):
+  - cpp-logger (`dftracer_install_external_project`, tag v0.0.8): URL changed
+    from `https://github.com/hariharan-devarajan/cpp-logger.git` to
+    `ssh://git@czgitlab.llnl.gov:7999/dftracer/cpp-logger.git`.
+  - brahma (`ExternalProject_Add`, `GIT_TAG v1.1.0`): `GIT_REPOSITORY` changed
+    from `https://github.com/hariharan-devarajan/brahma.git` to
+    `ssh://git@czgitlab.llnl.gov:7999/dftracer/brahma.git`.
+  On revert, restore both GitHub URLs (old values recorded in the
+  `NOTE(gitlab-migration)` comments directly above each changed line).
+  dftracer also had a pre-existing LC HPC `.gitlab-ci.yml` (web-only
+  tuolumne/corona jobs): on revert do NOT `git rm` it wholesale — restore the
+  pre-migration version from develop@26fb8d9 instead.
+
 ## GitLab Pages revert
 
 - The `pages` job lives only in `.gitlab-ci.yml`, so removing that file (step 3 above) removes Pages publishing. To just unpublish, delete the deployment under Settings → Pages on czgitlab (or Deploy → Pages).
