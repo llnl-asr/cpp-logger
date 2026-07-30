@@ -1,0 +1,26 @@
+stages: [test, deploy]
+
+build-test:
+  stage: test
+  image: gcc:12
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq cmake
+  script:
+    - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON
+    - cmake --build build -j "$(nproc)"
+    - ctest --test-dir build --output-on-failure
+
+pages:
+  stage: deploy
+  image: python:3.11
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "gitlab-migration"'  # temporary: remove after merge to develop
+  script:
+    - pip install -r docs/requirements.txt
+    - sphinx-build -b html docs public
+  artifacts:
+    paths: [public]
