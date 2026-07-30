@@ -23,6 +23,11 @@ git push origin develop         # this is the ONLY push to GitHub a revert needs
 git fetch origin && git reset --hard origin/develop   # only if you want to discard unmerged gitlab-only commits
 ```
 
+## GitLab Pages revert
+
+- The `pages` job lives only in `.gitlab-ci.yml`, so removing that file (step 3 above) removes Pages publishing. To just unpublish, delete the deployment under Settings → Pages on czgitlab (or Deploy → Pages).
+- The `docs/` Sphinx tree is intentionally **host-neutral** (plain Sphinx, no GitLab-specific markup) — keep it when reverting; it works as-is with ReadTheDocs on GitHub. If docs were newly authored during migration (e.g. cpp-logger's intro + API pages) and you don't want them on GitHub, `git rm -r docs/` in the same revert commit.
+
 ## GitLab-side cleanup (optional)
 
 - Delete or archive the repo at `https://czgitlab.llnl.gov/dftracer/<project>` (Settings → General → Advanced). Archiving is safer than deleting.

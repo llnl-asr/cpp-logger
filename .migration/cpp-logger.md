@@ -18,7 +18,7 @@ Selected: 2026-07-30. Source: `git@github.com:llnl/cpp-logger.git` (develop). Ta
 4. [x] Local test: cmake configure/build/ctest passes; YAML parses
 5. [x] Commit on `gitlab-migration` branch (5a93284)
 6. [x] Pushed `develop` (551ca66), tags v0.0.1–v0.0.8, `gitlab-migration` (5a93284) to gitlab
-7. [x] Pipeline URL: https://czgitlab.llnl.gov/dftracer/cpp-logger/-/pipelines
+7. [x] Pipeline URL: <https://czgitlab.llnl.gov/dftracer/cpp-logger/-/pipelines>
 8. [ ] User merges `gitlab-migration` → `develop` after green pipeline
 
 ## Status log
@@ -37,3 +37,11 @@ Everything added by this migration — see `.migration/REVERT.md` for the generi
 - Local + GitLab branch `gitlab-migration` (5a93284, adds only `.gitlab-ci.yml`)
 - GitLab repo content: `develop` @ 551ca66, tags v0.0.1–v0.0.8 (mirror only; archive/delete `dftracer/cpp-logger` on czgitlab if desired)
 - No GitHub-side changes were made — nothing to restore there. `.gitlab-ci.yml` is NOT on `develop` yet; if it gets merged, `git rm .gitlab-ci.yml` + push to origin reverts it.
+
+## GitLab Pages (added 2026-07-30)
+
+- Project had no docs, so a minimal Sphinx tree was authored on `gitlab-migration`: `docs/conf.py`, `index.rst`, `introduction.rst` (intro/build/quick-start), `api.rst` (C++ `Logger` + C `clogger` API from the public headers), `docs/requirements.txt`.
+- Docs are host-neutral Sphinx — the same source builds on ReadTheDocs (GitHub) with no changes. `conf.py` falls back to alabaster if `sphinx_rtd_theme` is missing.
+- `.gitlab-ci.yml` gained `stages: [test, deploy]` and a `pages` job (python:3.11, `sphinx-build -b html docs public`) on `develop` + temporarily `gitlab-migration` (remove the temp rule after merge).
+- Local build verified: `python3 -m sphinx -b html docs …` → build succeeded; YAML OK.
+- Revert: covered by removing `.gitlab-ci.yml`; optionally `git rm -r docs/` if the authored docs are unwanted, and delete the Pages deployment on czgitlab (see `REVERT.md`).
