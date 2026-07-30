@@ -29,7 +29,7 @@ build-test-docs:
     # Get the allocation's Flux job id and wait until it starts.
     - JOBID=$(flux job last)
     - echo "Using Flux allocation $JOBID"
-    - flux job wait-event -t 300 "$JOBID" start
+    - flux job wait-event "$JOBID" start
     # Each CI step runs on that allocation via flux proxy.
     - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE $PYTHON_MODULE && export CC=gcc CXX=g++ && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON"
     - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE && export CC=gcc CXX=g++ && cmake --build build -j \$(nproc)"
