@@ -45,3 +45,4 @@ Everything added by this migration — see `.migration/REVERT.md` for the generi
 - `.gitlab-ci.yml` gained `stages: [test, deploy]` and a `pages` job (python:3.11, `sphinx-build -b html docs public`) on `develop` + temporarily `gitlab-migration` (remove the temp rule after merge).
 - Local build verified: `python3 -m sphinx -b html docs …` → build succeeded; YAML OK.
 - Revert: covered by removing `.gitlab-ci.yml`; optionally `git rm -r docs/` if the authored docs are unwanted, and delete the Pages deployment on czgitlab (see `REVERT.md`).
+- 2026-07-30: gitlab-migration merged into gitlab develop (49ef724). New branch corona-ci: CI moved off docker images onto LC corona batch runner (1 node) via inline .corona-batch template (tags [batch, corona], SCHEDULER_PARAMETERS -N 1 -q pdebug -t 60, module-loaded gcc/python, venv for sphinx). Pages temp rule now corona-ci.
