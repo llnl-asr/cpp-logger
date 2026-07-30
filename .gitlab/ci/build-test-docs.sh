@@ -1,17 +1,28 @@
 #!/bin/bash
-# Runs inside the shared Flux allocation via `flux proxy <jobid> bash .gitlab/ci/build-test-docs.sh`.
-# Module names are hardcoded so nothing depends on environment expansion
-# across the flux proxy boundary.
+# Runs ON the allocated compute node (invoked via
+#   flux proxy <jobid> flux run -N 1 bash .gitlab/ci/build-test-docs.sh)
+# and executes the CI inside podman containers using the same images as the
+# GitHub Actions CI (gcc:12 for build/test, python:3.11 for docs) so GitLab CI
+# mimics GitHub CI as closely as possible.
 set -ex
 
-module load gcc/11.2.1 python/3.13.2
-export CC=gcc CXX=g++
+# Rootless podman needs node-local storage (overlayfs does not work on NFS
+# homes/workspaces). Keep image store + runroot in /var/tmp on the node.
+PODMAN_STORE=/var/tmp/$USER/podman-root
+PODMAN_RUNROOT=/var/tmp/$USER/podman-run
+mkdir -p "$PODMAN_STORE" "$PODMAN_RUNROOT"
+PODMAN="podman --root $PODMAN_STORE --runroot $PODMAN_RUNROOT"
 
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON
-cmake --build build -j "$(nproc)"
-ctest --test-dir build --output-on-failure
+# Build + test in the same image the GitHub CI used.
+$PODMAN run --rm -v "$PWD:/ws" -w /ws docker.io/library/gcc:12 bash -ec '
+  apt-get update -qq && apt-get install -y -qq cmake
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON
+  cmake --build build -j "$(nproc)"
+  ctest --test-dir build --output-on-failure
+'
 
-python3 -m venv .venv-docs
-source .venv-docs/bin/activate
-pip install -r docs/requirements.txt
-sphinx-build -b html docs public
+# Docs in the same image the pages job used.
+$PODMAN run --rm -v "$PWD:/ws" -w /ws docker.io/library/python:3.11 bash -ec '
+  pip install -r docs/requirements.txt
+  sphinx-build -b html docs public
+'

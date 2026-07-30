@@ -43,9 +43,10 @@ build-test-docs:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
     - JOBID=$(cat .flux-jobid)
-    # All steps live in a script (explicit module names, set -ex) so nothing
-    # depends on variable expansion across the flux proxy boundary.
-    - flux proxy "$JOBID" bash .gitlab/ci/build-test-docs.sh
+    # flux run -N 1 executes the script ON the allocated node; the script runs
+    # everything in podman containers (gcc:12 / python:3.11 — the same images
+    # as the GitHub Actions CI) to mimic GitHub CI.
+    - flux proxy "$JOBID" flux run -N 1 bash .gitlab/ci/build-test-docs.sh
   artifacts:
     paths: [public]
 
