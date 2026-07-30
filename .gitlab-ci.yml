@@ -43,10 +43,9 @@ build-test-docs:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
     - JOBID=$(cat .flux-jobid)
-    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE $PYTHON_MODULE && export CC=gcc CXX=g++ && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON"
-    - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE && export CC=gcc CXX=g++ && cmake --build build -j \$(nproc)"
-    - flux proxy "$JOBID" bash -lc "ctest --test-dir build --output-on-failure"
-    - flux proxy "$JOBID" bash -lc "module load $PYTHON_MODULE && python3 -m venv .venv-docs && source .venv-docs/bin/activate && pip install -r docs/requirements.txt && sphinx-build -b html docs public"
+    # All steps live in a script (explicit module names, set -ex) so nothing
+    # depends on variable expansion across the flux proxy boundary.
+    - flux proxy "$JOBID" bash .gitlab/ci/build-test-docs.sh
   artifacts:
     paths: [public]
 
@@ -66,7 +65,9 @@ pages:
 release-allocation:
   extends: .corona-flux
   stage: cleanup
-  needs: [allocate, build-test-docs]
+  # Runs last: alloc → build-test-docs → pages → deallocate. pages is optional
+  # since it only exists on develop/corona-ci pipelines.
+  needs: [allocate, build-test-docs, {job: pages, optional: true}]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
       when: always
