@@ -1,10 +1,10 @@
-stages: [test, deploy]
+stages: [alloc, test, deploy, cleanup]
 
-# LC corona CI via an explicit Flux allocation:
-# the job runs on the shell runner, creates ONE 1-node allocation with
-# `flux batch`, grabs its id with `flux job last`, and then runs EACH CI step
-# inside that same allocation through `flux proxy <jobid>`. The allocation is
-# cancelled in after_script, so the whole pipeline uses a single allocation.
+# LC corona CI via a single shared Flux allocation:
+#  - `allocate` creates ONE 1-node allocation and saves its Flux job id to
+#    .flux-jobid (artifact) so ALL jobs in the pipeline share it globally.
+#  - every CI job reads the id and runs its steps via `flux proxy <jobid>`.
+#  - `release-allocation` cancels it at the end (runs even on failure).
 .corona-flux:
   id_tokens:
     SITE_ID_TOKEN:
@@ -16,32 +16,39 @@ stages: [test, deploy]
     SMALL_QUEUE: pdebug
     SMALL_QUEUE_WALLTIME: 60
 
-# One allocation; every step below runs on it via flux proxy.
-build-test-docs:
+allocate:
   extends: .corona-flux
-  stage: test
+  stage: alloc
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
-    # Create the allocation (a placeholder batch job that just sleeps).
     - flux batch -N 1 -q "$SMALL_QUEUE" -t "${SMALL_QUEUE_WALLTIME}m" --job-name=cpp-logger-ci --wrap sleep inf
-    # Get the allocation's Flux job id and wait until it starts.
     - JOBID=$(flux job last)
-    - echo "Using Flux allocation $JOBID"
+    - echo "$JOBID" > .flux-jobid
+    - echo "Created Flux allocation $JOBID (shared by all CI jobs)"
+    # No timeout: batch queues may take long to schedule the allocation.
     - flux job wait-event "$JOBID" start
-    # Each CI step runs on that allocation via flux proxy.
+  artifacts:
+    paths: [.flux-jobid]
+
+build-test-docs:
+  extends: .corona-flux
+  stage: test
+  needs: [allocate]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - JOBID=$(cat .flux-jobid)
     - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE $PYTHON_MODULE && export CC=gcc CXX=g++ && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCPP_LOGGER_ENABLE_TESTING=ON"
     - flux proxy "$JOBID" bash -lc "module load $COMPILER_MODULE && export CC=gcc CXX=g++ && cmake --build build -j \$(nproc)"
     - flux proxy "$JOBID" bash -lc "ctest --test-dir build --output-on-failure"
     - flux proxy "$JOBID" bash -lc "module load $PYTHON_MODULE && python3 -m venv .venv-docs && source .venv-docs/bin/activate && pip install -r docs/requirements.txt && sphinx-build -b html docs public"
-  after_script:
-    # Release the allocation even if a step failed.
-    - JOBID=$(flux job last) && flux cancel "$JOBID" || true
   artifacts:
     paths: [public]
 
-# Publishes the artifact from build-test-docs — shell runner, no allocation.
+# Publishes the artifact from build-test-docs — no allocation, no flux.
 pages:
   extends: .corona-flux
   stage: deploy
@@ -53,3 +60,15 @@ pages:
     - echo "Publishing docs built by build-test-docs"
   artifacts:
     paths: [public]
+
+release-allocation:
+  extends: .corona-flux
+  stage: cleanup
+  needs: [allocate, build-test-docs]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
+  script:
+    - flux cancel "$(cat .flux-jobid)" || true
