@@ -1,3 +1,30 @@
+Intellectual Property Notice
+------------------------------
+
+cpp-logger is licensed under the MIT license (LICENSE or
+http://opensource.org/licenses/MIT).
+
+Copyrights and patents in the cpp-logger project are retained by contributors.
+No copyright assignment is required to contribute to cpp-logger.
+
+cpp-logger was developed at Lawrence Livermore National Laboratory as part
+of Applied Storage Research (ASR), LLNL-CODE-2024514.
+
+SPDX usage
+------------
+
+Individual files contain SPDX tags instead of the full license text.
+This enables machine processing of license information based on the SPDX
+License Identifiers that are available here: https://spdx.org/licenses/
+
+Files that are licensed under MIT contain the following text in the
+license header:
+
+    SPDX-License-Identifier: MIT
+
+LLNL Disclaimer
+-----------------
+
 This work was produced under the auspices of the U.S. Department of
 Energy by Lawrence Livermore National Laboratory under Contract
 DE-AC52-07NA27344.
