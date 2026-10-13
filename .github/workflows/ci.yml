@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gcc12
+            image: gcc:12
+            bypass: "ON"
+          - name: gcc12-bypass-off
+            image: gcc:12
+            bypass: "OFF"
+          - name: glibc-2.28
+            image: quay.io/pypa/manylinux_2_28_x86_64
+            bypass: "ON"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CMake (Debian)
+        if: startsWith(matrix.image, 'gcc')
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq cmake
+
+      - name: Install CMake (manylinux)
+        if: startsWith(matrix.image, 'quay.io/pypa')
+        run: |
+          /opt/python/cp311-cp311/bin/pip install cmake
+          echo "/opt/python/cp311-cp311/bin" >> "$GITHUB_PATH"
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCPP_LOGGER_ENABLE_TESTING=ON
+          -DCPP_LOGGER_WARNINGS_AS_ERRORS=ON
+          -DCPP_LOGGER_LIBC_BYPASS=${{ matrix.bypass }}
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  format:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check formatting
+        run: |
+          pip install clang-format==19.1.7
+          ./script/formatting/check-formatting.sh
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build docs
+        run: |
+          pip install -r docs/requirements.txt
+          sphinx-build -b html docs public
