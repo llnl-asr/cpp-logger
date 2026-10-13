@@ -1,4 +1,8 @@
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.10.2...3.31)
+
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 NEW)
+endif()
 #------------------------------------------------------------------------------
 # Version information
 #------------------------------------------------------------------------------

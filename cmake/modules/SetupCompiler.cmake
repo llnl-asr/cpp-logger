@@ -90,12 +90,10 @@ macro(cpp_logger_add_c_flags MY_FLAGS)
 endmacro()
 
 cpp_logger_add_cxx_flags(CMAKE_CXX_FLAGS
-  -fPIC -Wall -Wextra -pedantic -Wno-unused-parameter -Wnon-virtual-dtor
-  -Wno-deprecated-declarations)
+  -fPIC -Wall -Wextra -pedantic -Wno-unused-parameter -Wnon-virtual-dtor)
 
 cpp_logger_add_c_flags(CMAKE_C_FLAGS
-  -fPIC -Wall -Wextra -pedantic -Wno-unused-parameter
-  -Wno-deprecated-declarations)
+  -fPIC -Wall -Wextra -pedantic -Wno-unused-parameter)
 
 if (${GLIBC_VERSION} VERSION_GREATER_EQUAL "2.19")
   # to suppress usleep() warning
