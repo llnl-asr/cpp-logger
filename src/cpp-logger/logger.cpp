@@ -26,7 +26,8 @@ using fputs_fn_t = int (*)(const char *, FILE *);
 using fflush_fn_t = int (*)(FILE *);
 
 // Never take the address of a libc function here. In a non-PIE executable that
-// makes its PLT stub the canonical address, and GOTCHA lookups then loop at exit.
+// makes its PLT stub the canonical address, and GOTCHA lookups then loop at
+// exit.
 struct LibcFns {
   vsnprintf_fn_t vsnprintf_fn = nullptr;
   fputs_fn_t fputs_fn = nullptr;
@@ -58,7 +59,8 @@ const LibcFns &eager_libc_fns = libc_fns();
 CPP_LOGGER_PRINTF(3, 0)
 int real_vsnprintf(char *buf, size_t size, const char *fmt, va_list args) {
   const LibcFns &fns = libc_fns();
-  if (fns.vsnprintf_fn != nullptr) return fns.vsnprintf_fn(buf, size, fmt, args);
+  if (fns.vsnprintf_fn != nullptr)
+    return fns.vsnprintf_fn(buf, size, fmt, args);
   return vsnprintf(buf, size, fmt, args);
 }
 
@@ -90,19 +92,31 @@ void Logger::vlog(LoggerType type, const char *string, va_list args) {
   if (level < type) return;
   const char *tag = nullptr;
   switch (type) {
-    case LoggerType::CPP_LOGGER_PRINT: tag = "PRINT"; break;
-    case LoggerType::CPP_LOGGER_TRACE: tag = "TRACE"; break;
-    case LoggerType::CPP_LOGGER_DEBUG: tag = "DEBUG"; break;
-    case LoggerType::CPP_LOGGER_INFO: tag = "INFO"; break;
-    case LoggerType::CPP_LOGGER_WARN: tag = "WARN"; break;
-    case LoggerType::CPP_LOGGER_ERROR: tag = "ERROR"; break;
-    case LoggerType::CPP_LOGGER_NONE: break;
+    case LoggerType::CPP_LOGGER_PRINT:
+      tag = "PRINT";
+      break;
+    case LoggerType::CPP_LOGGER_TRACE:
+      tag = "TRACE";
+      break;
+    case LoggerType::CPP_LOGGER_DEBUG:
+      tag = "DEBUG";
+      break;
+    case LoggerType::CPP_LOGGER_INFO:
+      tag = "INFO";
+      break;
+    case LoggerType::CPP_LOGGER_WARN:
+      tag = "WARN";
+      break;
+    case LoggerType::CPP_LOGGER_ERROR:
+      tag = "ERROR";
+      break;
+    case LoggerType::CPP_LOGGER_NONE:
+      break;
   }
   if (tag == nullptr) return;
   char buffer[4096];
   real_vsnprintf(buffer, sizeof(buffer), string, args);
-  const std::string line =
-      "[" + _app_name + " " + tag + "]: " + buffer + "\n";
+  const std::string line = "[" + _app_name + " " + tag + "]: " + buffer + "\n";
   real_puts_flush(line.c_str(), _file);
 }
 }  // namespace cpplogger

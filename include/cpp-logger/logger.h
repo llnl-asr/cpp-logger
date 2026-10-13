@@ -53,8 +53,9 @@ class Logger {
     return instance;
   }
 
-  void log(LoggerType type, const char *string, ...) CPP_LOGGER_PRINTF(3, 4);
-  void vlog(LoggerType type, const char *string, va_list args) CPP_LOGGER_PRINTF(3, 0);
+  void log(LoggerType type, const char* string, ...) CPP_LOGGER_PRINTF(3, 4);
+  void vlog(LoggerType type, const char* string, va_list args)
+      CPP_LOGGER_PRINTF(3, 0);
 };
 
 }  // namespace cpplogger
