@@ -93,6 +93,10 @@ if (CPP_LOGGER_USE_CLANG_LIBCXX)
     set (GCC_TOOLCHAIN "")
 endif (CPP_LOGGER_USE_CLANG_LIBCXX)
 
+# Resolve the real libc I/O functions at load so GOTCHA wrappers (DFTracer)
+# never see logger output. Linux only.
+option (CPP_LOGGER_LIBC_BYPASS "Call libc I/O directly, bypassing GOTCHA wrappers." ON)
+
 # Testing
 option (CPP_LOGGER_ENABLE_TESTING "Enable tests for CPP_LOGGER." OFF)
 
@@ -180,6 +184,12 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     LINKER_LANGUAGE CXX
     VERSION ${CPP_LOGGER_PACKAGE_VERSION}
     SOVERSION 1)
+if (CPP_LOGGER_LIBC_BYPASS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CPP_LOGGER_LIBC_BYPASS=1)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
+else ()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CPP_LOGGER_LIBC_BYPASS=0)
+endif ()
 cpp_logger_install_headers("${CPP_LOGGER_PUBLIC_INCLUDE};${CPP_LOGGER_SRC_PRIVATE}" ${CMAKE_CURRENT_SOURCE_DIR})
 
 install(
@@ -346,7 +356,7 @@ append_str_tf(_str
   CPP_LOGGER_USE_CLANG_LIBCXX
   CPP_LOGGER_WARNINGS_AS_ERRORS
   CPP_LOGGER_ENABLE_TESTING
-  
+  CPP_LOGGER_LIBC_BYPASS
 )
 string(APPEND _str
   "\n== End CPP_LOGGER Configuration Summary ==\n")

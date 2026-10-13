@@ -6,9 +6,16 @@
 #define CPPLOGGER_LOGGER_H
 
 #include <cstdarg>
+#include <cstdio>
 #include <memory>
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
+
+#if defined(__GNUC__)
+#define CPP_LOGGER_PRINTF(fmt, args) __attribute__((format(printf, fmt, args)))
+#else
+#define CPP_LOGGER_PRINTF(fmt, args)
+#endif
 
 namespace cpplogger {
 enum LoggerType {
@@ -24,16 +31,17 @@ enum LoggerType {
 class Logger {
  private:
   std::string _app_name;
-  FILE *_file;
+  FILE* _file;
   static std::unordered_map<std::string, std::shared_ptr<Logger>> instance_map;
 
  public:
   LoggerType level;
 
-  explicit Logger(std::string app_name, FILE *file = stdout)
+  explicit Logger(std::string app_name, FILE* file = stdout)
       : _app_name(app_name), _file(file), level(LoggerType::CPP_LOGGER_ERROR) {}
 
-  static std::shared_ptr<Logger> Instance(std::string app_name = "LOGGER", FILE *file = stdout) {
+  static std::shared_ptr<Logger> Instance(std::string app_name = "LOGGER",
+                                          FILE* file = stdout) {
     auto iter = instance_map.find(app_name);
     std::shared_ptr<Logger> instance;
     if (iter == instance_map.end()) {
@@ -45,62 +53,8 @@ class Logger {
     return instance;
   }
 
-  void log(LoggerType type, const char *string, ...) {
-    va_list args;
-    va_start(args, string);
-    char buffer[4096];
-    int resu = vsprintf(buffer, string, args);
-    (void)resu;
-    switch (type) {
-      case LoggerType::CPP_LOGGER_PRINT: {
-        if (level >= LoggerType::CPP_LOGGER_PRINT) {
-          fprintf(_file, "[%s PRINT]: %s\n", _app_name.c_str(), buffer);
-          fflush(_file);
-        }
-        break;
-      }
-      case LoggerType::CPP_LOGGER_TRACE: {
-        if (level >= LoggerType::CPP_LOGGER_TRACE) {
-          fprintf(_file, "[%s TRACE]: %s\n", _app_name.c_str(), buffer);
-          fflush(_file);
-        }
-        break;
-      }
-      case LoggerType::CPP_LOGGER_DEBUG: {
-        if (level >= LoggerType::CPP_LOGGER_DEBUG) {
-          fprintf(_file, "[%s DEBUG]: %s\n", _app_name.c_str(), buffer);
-          fflush(_file);
-        }
-        break;
-      }
-      case LoggerType::CPP_LOGGER_INFO: {
-        if (level >= LoggerType::CPP_LOGGER_INFO) {
-          fprintf(_file, "[%s INFO]: %s\n", _app_name.c_str(), buffer);
-          fflush(_file);
-        }
-        break;
-      }
-      case LoggerType::CPP_LOGGER_WARN: {
-        if (level >= LoggerType::CPP_LOGGER_WARN) {
-          fprintf(_file, "[%s WARN]: %s\n", _app_name.c_str(), buffer);
-          fflush(_file);
-        }
-        break;
-      }
-      case LoggerType::CPP_LOGGER_ERROR: {
-        if (level >= LoggerType::CPP_LOGGER_ERROR) {
-          fprintf(_file, "[%s ERROR]: %s\n", _app_name.c_str(), buffer);
-          fflush(_file);
-        }
-        break;
-      }
-      default: {
-          break;
-      }
-    }
-
-    va_end(args);
-  }
+  void log(LoggerType type, const char *string, ...) CPP_LOGGER_PRINTF(3, 4);
+  void vlog(LoggerType type, const char *string, va_list args) CPP_LOGGER_PRINTF(3, 0);
 };
 
 }  // namespace cpplogger
